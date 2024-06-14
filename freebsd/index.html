@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/favicon.ico?v=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/default.min.css">
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/c.min.js"></script>
+    <script defer src="/hlinit.js"></script>
+    <link href="/styles.css?v=5" rel="stylesheet">
+    <title>RNG on FreeBSD | WikiRand</title>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg bg-primary" data-bs-theme="dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">WikiRand</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            RNG on OSes
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/windows">RNG on Windows</a></li>
+                            <li><a class="dropdown-item" href="/osx">RNG on macOS</a></li>
+                            <li><a class="dropdown-item" href="/linux">RNG on Linux</a></li>
+                            <li><a class="dropdown-item active" href="#">RNG on FreeBSD</a></li>
+                            <li><a class="dropdown-item" href="/openbsd">RNG on OpenBSD</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" aria-current="page" href="/about">About</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="wr-container">
+        <h1>RNG on FreeBSD</h1>
+        <p><i>This article also applies to NetBSD.</i></p>
+        <p>The example code in this article uses <code>min()</code>, which is defined here.</p>
+        <pre><code class="language-c">static inline size_t min(size_t a, size_t b) {
+  return a &lt; b ? a : b;
+}</code></pre>
+        <h2>Generating pseudo-random bytes</h2>
+        <p>Use <code>arc4random_buf(3)</code>. <a href="https://man.freebsd.org/cgi/man.cgi?query=arc4random&sektion=3&format=html">This is the man page.</a></p>
+        <h2>Generating truly random bytes</h2>
+        <p>Use <code>sysctl(3)</code> with <code>CTL_KERN</code> / <code>KERN_ARND</code>.</p>
+        <p>Here is some example code:</p>
+        <pre><code>bool getentropy(uint8_t *buf, size_t size) {
+  const int mib[2] = { CTL_KERN, KERN_ARND };
+  size_t len, done;
+  done = 0;
+  do {
+    len = min(size, 256);
+    if (sysctl(mib, 2, buf, &len, NULL, 0) == -1)
+      return false;
+    done += len;
+    buf += len;
+    size -= len;
+  } while (size > 0);
+  return true;
+}</code></pre>
+    </div>
+</body>
+</html>

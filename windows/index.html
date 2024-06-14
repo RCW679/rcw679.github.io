@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/favicon.ico?v=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/default.min.css">
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/c.min.js"></script>
+    <script defer src="/hlinit.js"></script>
+    <link href="/styles.css?v=5" rel="stylesheet">
+    <title>RNG on Windows | WikiRand</title>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg bg-primary" data-bs-theme="dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">WikiRand</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            RNG on OSes
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item active" href="#">RNG on Windows</a></li>
+                            <li><a class="dropdown-item" href="/osx">RNG on macOS</a></li>
+                            <li><a class="dropdown-item" href="/linux">RNG on Linux</a></li>
+                            <li><a class="dropdown-item" href="/freebsd">RNG on FreeBSD</a></li>
+                            <li><a class="dropdown-item" href="/openbsd">RNG on OpenBSD</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" aria-current="page" href="/about">About</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="wr-container">
+        <h1>RNG on Windows</h1>
+        <h2>Generating pseudo-random bytes</h2>
+        <p>Try <code>ProcessPrng</code> from <code>BCryptPrimitives.dll</code>, then <code>RtlGenRandom</code> (<code>SystemFunction036</code> from <code>advapi32.dll</code>).</p>
+        <h3>Using <code>ProcessPrng</code></h3>
+        <p>The signature for <code>ProcessPrng</code> is:</p>
+        <pre><code class="language-c">void __stdcall ProcessPrng(
+  uint8_t *pbData,
+  size_t cbData
+);</code></pre>
+        <p>Pass it a buffer and the length of that buffer.</p>
+        <p><code>ProcessPrng</code> may not be available on Windows 7 or older. However, on UWP apps on Windows 8 or later, it is the only way to generate random bytes without using the WinRT API, as <code>RtlGenRandom</code> (<code>SystemFunction036</code> from <code>advapi32.dll</code>) is actually a forwarder to <code>SystemFunction036</code> from <code>cryptbase.dll</code>, and <code>cryptbase.dll</code> cannot be opened on UWP.</p>
+        <h4>Checking if <code>ProcessPrng</code> can safely be used</h4>
+        <p>The recommended method to check if <code>ProcessPrng</code> can safely be used is to use <code>IsWindows8OrGreater</code>.</p>
+        <p>Here is some example code:</p>
+        <pre><code class="language-c">if (IsWindows8OrGreater()) {
+  ProcessPrng(buf, len);
+  return true;
+}
+return false;</code></pre>
+        <p>The Windows SDK does not have an import library for <code>BCryptPrimitives.dll</code>. To use <code>ProcessPrng</code> via its signature, use <a href="/windows/processprng">these .lib files</a>.</p>
+        <p>Since <code>IsWindows8OrGreater</code> is a statically-linked function, there are some instances (e.g. MSVC-Free Software) where Microsoft's <code>IsWindows8OrGreater</code> implementation cannot be used because it will add MS-copyrighted code to the compiled binary. For these cases, this is our implementation of <code>IsWindows8OrGreater</code>:</p>
+        <pre><code class="language-c">ULONGLONG w8c_mask = 0;
+const OSVERSIONINFOEXW w8c_osvi = { sizeof(OSVERSIONINFOEXW), 6, 2, 0, 0, {0}, 0, 0 };
+bool IsWindows8OrGreater()
+{
+  if (w8c_mask == 0) {
+    w8c_mask = VerSetConditionMask(
+      VerSetConditionMask(
+        VerSetConditionMask(0,
+          VER_MAJORVERSION, VER_GREATER_EQUAL),
+        VER_MINORVERSION, VER_GREATER_EQUAL),
+      VER_SERVICEPACKMAJOR, VER_GREATER_EQUAL
+    );
+  }
+  return VerifyVersionInfoW(&w8c_osvi, VER_MAJORVERSION | VER_MINORVERSION | VER_SERVICEPACKMAJOR, w8c_mask) != 0;
+}</code></pre>
+        <h2>Generating truly random bytes</h2>
+        <p>Generating truly random bytes is not possible on Windows.</p>
+    </div>
+</body>
+</html>

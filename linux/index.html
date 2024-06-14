@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/favicon.ico?v=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/default.min.css">
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/c.min.js"></script>
+    <script defer src="/hlinit.js"></script>
+    <link href="/styles.css?v=5" rel="stylesheet">
+    <title>RNG on Linux | WikiRand</title>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg bg-primary" data-bs-theme="dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">WikiRand</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            RNG on OSes
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/windows">RNG on Windows</a></li>
+                            <li><a class="dropdown-item" href="/osx">RNG on macOS</a></li>
+                            <li><a class="dropdown-item active" href="#">RNG on Linux</a></li>
+                            <li><a class="dropdown-item" href="/freebsd">RNG on FreeBSD</a></li>
+                            <li><a class="dropdown-item" href="/openbsd">RNG on OpenBSD</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" aria-current="page" href="/about">About</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="wr-container">
+        <h1>RNG on Linux</h1>
+        <p>Some of the example code in this article uses <code>min()</code>, which is defined here.</p>
+        <pre><code class="language-c">static inline size_t min(size_t a, size_t b) {
+  return a &lt; b ? a : b;
+}</code></pre>
+        <h2>Generating pseudo-random bytes</h2>
+        <p>Try <code>getrandom(2)</code>, then <code>/dev/urandom</code>, then <code>sysctl(2)-uuidgen</code>.</p>
+        <h3>Using <code>getrandom(2)</code></h3>
+        <p>The signature for <code>getrandom(2)</code> is:</p>
+        <pre><code class="language-c">ssize_t getrandom(void buf[.buflen], size_t buflen, unsigned int flags);</code></pre>
+        <p>Pass it a buffer, the length of that buffer, and 0 for the flags.</p>
+        <p>It is recommended to use <code>getrandom(2)</code> via <code>syscall(2)</code>, as it is used in <a href="https://github.com/libressl/openbsd/blob/libressl-v3.9.2/src/lib/libcrypto/arc4random/getentropy_linux.c#L181">LibreSSL's getentropy inplementation for Linux</a>.</p>
+        <p>For buffer sizes greater than 256, use <code>getrandom(2)</code> in iterations of 256 or less bytes each.</p>
+        <p>Here is some example code (LibreSSL-derived):</p>
+        <pre><code class="language-c">int pre_errno = errno;
+int ret;
+uint8_t *_buf = (uint8_t*)buf;
+size_t _len = len;
+while (_len > 0) {
+  size_t clen = _len &lt; 256 ? _len : 256;
+  do {
+    ret = syscall(SYS_getrandom, _buf, clen, GRND_NONBLOCK);
+  } while (ret == -1 && errno == EINTR);
+  if (ret != clen)
+    return false;
+  _buf += clen;
+  _len -= clen;
+}
+
+errno = pre_errno;
+return true;</code></pre>
+        <h3>Using <code>/dev/urandom</code></h3>
+        <p>The <code>/dev/urandom</code> method requires opening and reading from <code>/dev/urandom</code>.</p>
+        <p>Here is some example code (original):</p>
+        <pre><code class="language-c">int fd = open("/dev/urandom", O_RDONLY);
+if (fd != 0) {
+  if (read(fd, buf, length) > 0) {
+    close(fd);
+    return true;
+  }
+  close(fd);
+}
+return false;</code></pre>
+        <h3>Using <code>sysctl(2)-uuidgen</code></h3>
+        <p>This method is a fallback and involves using <code>sysctl(2)</code> to access the <code>/proc/sys/kernel/random/uuid</code> value and stripping deterministic data from the returned UUID.</p>
+        <p>Here is some example code (LibreSSL-derived):</p>
+        <pre><code class="language-c">static uint8_t gotdata(uint8_t *buf, size_t len)
+{
+  uint8_t any_set = 0;
+  size_t i;
+  for (i = 0; i &lt; len; ++i)
+    any_set |= buf[i];
+  return any_set;
+}
+
+static int mib[] = { CTL_KERN, KERN_RANDOM, RANDOM_UUID };
+size_t i = 0;
+uint8_t _buf[16];
+while (i &lt; length) {
+  size_t chunk = min(length - i, 15);
+  size_t uuidlen = 16;
+  // SYS__sysctl because some systems already removed sysctl()
+  struct __sysctl_args args = {
+    .name = mib,
+    .nlen = 3,
+    .oldval = _buf,
+    .oldlenp = &uuidlen
+  };
+  if (syscall(SYS__sysctl, &args) != 0)
+    goto sysctlfailed;
+  // _buf[6] bits 7:4 and _buf[8] bits 7:6 are deterministic.
+  // (values 0100 and 10 respectively)
+  // Strip these values out, leaving a 15-byte random value.
+  _buf[6] = ((_buf[6] & 0x0f) &lt;&lt; 4) | (_buf[8] & 0x0f);
+  memmove(_buf + 8, _buf + 9, 7);
+  // Copy the bytes into the chunk
+  memcpy(buf + i, _buf, chunk);
+  i += chunk;
+}
+if (gotdata(buf, length)) {
+  errno = save_errno;
+  return true;
+}
+sysctlfailed:
+return false;</code></pre>
+        <h2>Generating truly random bytes</h2>
+        <p>Use the same procedure that you would use to generate pseudo-random bytes, but instead of using <code>GRND_NONBLOCK</code>, use <code>GRND_RANDOM | GRND_NONBLOCK</code>, and instead of opening <code>/dev/urandom</code>, open <code>/dev/random</code>.</p>
+    </div>
+</body>
+</html>

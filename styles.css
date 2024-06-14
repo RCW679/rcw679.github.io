@@ -1,0 +1,37 @@
+body {
+    font-size: 14pt;
+    height: fit-content;
+    background-image: url("/hexback.png");
+}
+
+pre {
+    border-radius: 10pt;
+    font-size: 14pt;
+    background-color: #ccc;
+    padding: 5pt;
+    margin: 0 5pt 1rem;
+}
+code {
+    border-radius: 5pt;
+}
+
+nav {
+    margin: 0;
+}
+
+div.wr-container {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: fit-content;
+    height: 100%;
+    margin: 0;
+    padding: 5pt;
+}
+
+table {
+    border-collapse: collapse;
+}
+
+td {
+    padding: 2pt;
+}
