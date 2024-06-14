@@ -1,2 +1,2 @@
-hljs.configure({languages: []}); // disable autodetect
+hljs.configure({languages: []}); // disable language autodetect
 document.addEventListener("DOMContentLoaded", hljs.highlightAll);
