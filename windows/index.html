@@ -46,21 +46,19 @@
         <p>Try <code>ProcessPrng</code> from <code>BCryptPrimitives.dll</code>, then <code>RtlGenRandom</code> (<code>SystemFunction036</code> from <code>advapi32.dll</code>).</p>
         <h3>Using <code>ProcessPrng</code></h3>
         <p>The signature for <code>ProcessPrng</code> is:</p>
-        <pre><code class="language-c">void __stdcall ProcessPrng(
-  uint8_t *pbData,
-  size_t cbData
+        <pre><code class="language-c">BOOL __stdcall ProcessPrng(
+  PBYTE  pbData,
+  SIZE_T cbData
 );</code></pre>
         <p>Pass it a buffer and the length of that buffer.</p>
         <p><code>ProcessPrng</code> may not be available on Windows 7 or older. However, on UWP apps on Windows 8 or later, it is the only way to generate random bytes without using the WinRT API, as <code>RtlGenRandom</code> (<code>SystemFunction036</code> from <code>advapi32.dll</code>) is actually a forwarder to <code>SystemFunction036</code> from <code>cryptbase.dll</code>, and <code>cryptbase.dll</code> cannot be opened on UWP.</p>
         <h4>Checking if <code>ProcessPrng</code> can safely be used</h4>
         <p>The recommended method to check if <code>ProcessPrng</code> can safely be used is to use <code>IsWindows8OrGreater</code>.</p>
         <p>Here is some example code:</p>
-        <pre><code class="language-c">if (IsWindows8OrGreater()) {
-  ProcessPrng(buf, len);
-  return true;
-}
+        <pre><code class="language-c">if (IsWindows8OrGreater())
+  return ProcessPrng(buf, len) != 0;
 return false;</code></pre>
-        <p>The Windows SDK does not have an import library for <code>BCryptPrimitives.dll</code>. To use <code>ProcessPrng</code> via its signature, use <a href="/windows/processprng">these .lib files</a>.</p>
+        <p>The Windows SDK does not have an import library for <code>ProcessPrng</code>. To use <code>ProcessPrng</code> via its signature, use <a href="/windows/processprng">these .lib files</a>.</p>
         <p>Since <code>IsWindows8OrGreater</code> is a statically-linked function, there are some instances (e.g. MSVC-Free Software) where Microsoft's <code>IsWindows8OrGreater</code> implementation cannot be used because it will add MS-copyrighted code to the compiled binary. For these cases, this is our implementation of <code>IsWindows8OrGreater</code>:</p>
         <pre><code class="language-c">ULONGLONG w8c_mask = 0;
 const OSVERSIONINFOEXW w8c_osvi = { sizeof(OSVERSIONINFOEXW), 6, 2, 0, 0, {0}, 0, 0 };
@@ -77,6 +75,16 @@ bool IsWindows8OrGreater()
   }
   return VerifyVersionInfoW(&w8c_osvi, VER_MAJORVERSION | VER_MINORVERSION | VER_SERVICEPACKMAJOR, w8c_mask) != 0;
 }</code></pre>
+        <h3>Using <code>RtlGenRandom</code></h3>
+        <p><code>RtlGenRandom</code> is actually <code>SystemFunction036</code> from <code>advapi32.dll</code>.</p>
+        <p>The signature for <code>RtlGenRandom</code> is:</p>
+        <pre><code class="language-c">BOOL __stdcall SystemFunction036(
+  PBYTE  pbData,
+  SIZE_T cbData
+);</code></pre>
+        <p>Pass it a buffer and the length of that buffer.</p>
+        <p>Here is some example code:</p>
+        <pre><code>return SystemFunction036(buf, len);</code></pre>
         <h2>Generating truly random bytes</h2>
         <p>Generating truly random bytes is not possible on Windows.</p>
     </div>
