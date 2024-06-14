@@ -83,6 +83,7 @@ bool IsWindows8OrGreater()
   SIZE_T cbData
 );</code></pre>
         <p>Pass it a buffer and the length of that buffer.</p>
+        <p>The Windows SDK does not have an import library for <code>RtlGenRandom</code>. To use <code>RtlGenRandom</code> via its signature, use <a href="/windows/rtlgenrandom/">these .lib files</a>.</p>
         <p>Here is some example code:</p>
         <pre><code>return SystemFunction036(buf, len);</code></pre>
         <h2>Generating truly random bytes</h2>
